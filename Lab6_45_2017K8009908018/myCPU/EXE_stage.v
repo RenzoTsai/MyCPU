@@ -217,20 +217,6 @@ always @(posedge clk ) begin
     
 end
 
-// always @(posedge clk ) begin
-//     if (reset) begin
-//         es_dividend_tvalid_u_r <=0;
-//         es_divisor_tvalid_u_r  <=0;  
-//     end
-//     else if (divu_op && !es_divisor_tready_u && !es_dividend_tready_u && div_en) begin
-//         es_dividend_tvalid_u_r <=1;
-//         es_divisor_tvalid_u_r  <=1; 
-//     end
-//     else if (es_divisor_tready_u  && es_dividend_tready_u) begin
-//         es_dividend_tvalid_u_r <=0;
-//         es_divisor_tvalid_u_r  <=0; 
-//     end
-// end
 
 //write or read hi/lo 
 assign hi_wdata = ((mult_op||multu_op||div_op||divu_op)&dest_is_hi)?es_hi_result:es_rs_value;
