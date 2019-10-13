@@ -27,7 +27,7 @@ wire        es_ready_go   ;
 assign out_es_valid=es_valid ;
 
 reg  [`DS_TO_ES_BUS_WD -1:0] ds_to_es_bus_r;
-wire [11:0] es_alu_op     ;
+wire [15:0] es_alu_op     ;
 wire        es_load_op    ;
 wire        es_src1_is_sa ;  
 wire        es_src1_is_pc ;
@@ -49,6 +49,16 @@ wire dest_is_lo;
 wire es_res_from_hi;
 wire es_res_from_lo;
 wire [31:0]es_result;
+wire mult_op;
+wire multu_op;
+wire div_op;
+wire divu_op;
+assign mult_op  = es_alu_op[12];
+assign multu_op = es_alu_op[13];
+assign div_op  = es_alu_op[14] ;
+assign divu_op = es_alu_op[15] ;
+
+
 
 wire [31:0] es_divisor_tdata;
 wire es_divisor_tready;
@@ -115,7 +125,7 @@ assign es_to_ms_bus = {es_res_from_mem,  //70:70
                        es_pc             //31:0
                       };
 
-assign es_ready_go    = 1'b1;
+assign es_ready_go    = !(div_op && !es_dout_tvalid) && !(divu_op && !es_dout_tvalid_u);
 assign es_allowin     = !es_valid || es_ready_go && ms_allowin;
 assign es_to_ms_valid =  es_valid && es_ready_go;
 always @(posedge clk) begin
@@ -139,48 +149,58 @@ assign es_alu_src2 = es_src2_is_imm ? {{16{es_imm[15]}}, es_imm[15:0]} :
                      es_src2_is_8   ? 32'd8 :
                                       es_rt_value;
 //Handle mult & div:
-wire mult_op;
-wire multu_op;
-wire div_op;
-wire divu_op;
-assign mult_op  = es_alu_op[12];
-assign multu_op = es_alu_op[13];
-assign div_op  = es_alu_op[14] ;
-assign divu_op = es_alu_op[15] ;
-
 
 //handle divid and unsigned divid
 assign es_dividend_tdata = es_alu_src1 ;
 assign es_divisor_tdata  = es_alu_src2 ;
 assign es_dividend_tdata_u = es_alu_src1 ;
 assign es_divisor_tdata_u  = es_alu_src2 ;
+
+// assign es_divisor_tvalid = (div_op && !es_divisor_tready && !es_dividend_tready)?1: es_divisor_tvalid_r;
+// assign es_dividend_tvalid = (div_op && !es_divisor_tready && !es_dividend_tready)?1:es_dividend_tvalid_r;
+// assign es_divisor_tvalid_u = (divu_op && !es_divisor_tready_u && !es_dividend_tready_u)?1:es_divisor_tvalid_u_r;
+// assign es_dividend_tvalid_u = (divu_op && !es_divisor_tready_u && !es_dividend_tready_u)?1:es_dividend_tvalid_u_r;
+
 assign es_divisor_tvalid = es_divisor_tvalid_r;
 assign es_dividend_tvalid = es_dividend_tvalid_r;
 assign es_divisor_tvalid_u = es_divisor_tvalid_u_r;
 assign es_dividend_tvalid_u = es_dividend_tvalid_u_r;
 
-assign es_hi_result = (div_op  && es_dout_tvalid  )?es_dout_tdata[63:32]:
-                      (divu_op && es_dout_tvalid_u)?es_dout_tdata_u[63:32]: 
+assign es_hi_result = (div_op  && es_dout_tvalid  )?es_dout_tdata[31:0]:
+                      (divu_op && es_dout_tvalid_u)?es_dout_tdata_u[31:0]: 
                       (mult_op || multu_op        )?es_alu_hi_result:
                       0;
-assign es_lo_result = (div_op  && es_dout_tvalid  )?es_dout_tdata[31:0]:
-                      (divu_op && es_dout_tvalid_u)?es_dout_tdata_u[31:0]: 
+assign es_lo_result = (div_op  && es_dout_tvalid  )?es_dout_tdata[63:32]:
+                      (divu_op && es_dout_tvalid_u)?es_dout_tdata_u[63:32]: 
                       (mult_op || multu_op        )?es_alu_lo_result:
                       0;
 
+reg div_en;
+always @(posedge clk ) begin
+    if (reset) begin
+       div_en<=1;
+    end
+    else if (div_op||divu_op) begin
+        div_en <=0;
+    end
+    else begin
+        div_en <=1;
+    end
+end
 
 always @(posedge clk ) begin
     if (reset) begin
         es_dividend_tvalid_r <=0;
         es_divisor_tvalid_r  <=0;  
     end
-    else if (div_op && !es_divisor_tready && !es_dividend_tready) begin
-        es_dividend_tvalid_r <=1;
-        es_divisor_tvalid_r  <=1;
-    end
-    else if (div_op && es_divisor_tready && es_dividend_tready) begin
+    
+    else if (es_divisor_tready && es_dividend_tready) begin
         es_dividend_tvalid_r <=0;
         es_divisor_tvalid_r  <=0;
+    end
+    else if (div_op &&div_en) begin
+        es_dividend_tvalid_r <=1;
+        es_divisor_tvalid_r  <=1;
     end
 end
 
@@ -189,11 +209,11 @@ always @(posedge clk ) begin
         es_dividend_tvalid_u_r <=0;
         es_divisor_tvalid_u_r  <=0;  
     end
-    else if (div_op && !es_divisor_tready && !es_dividend_tready) begin
+    else if (divu_op && !es_divisor_tready_u && !es_dividend_tready_u && div_en) begin
         es_dividend_tvalid_u_r <=1;
         es_divisor_tvalid_u_r  <=1; 
     end
-    else if (div_op && es_divisor_tready && es_dividend_tready) begin
+    else if (es_divisor_tready_u  && es_dividend_tready_u) begin
         es_dividend_tvalid_u_r <=0;
         es_divisor_tvalid_u_r  <=0; 
     end
@@ -202,8 +222,8 @@ end
 //write or read hi/lo 
 assign hi_wdata = ((mult_op||multu_op||div_op||divu_op)&dest_is_hi)?es_hi_result:es_rs_value;
 assign lo_wdata = ((mult_op||multu_op||div_op||divu_op)&dest_is_lo)?es_lo_result:es_rs_value;
-assign es_hi_we = dest_is_hi ;
-assign es_lo_we = dest_is_lo ;
+assign es_hi_we = dest_is_hi || (div_op&&(es_dout_tvalid_u || es_dout_tvalid ));
+assign es_lo_we = dest_is_lo || (div_op&&(es_dout_tvalid_u || es_dout_tvalid ));
 assign es_result = es_res_from_hi ? hi_rdata:
                    es_res_from_lo ? lo_rdata:
                    es_alu_result;
