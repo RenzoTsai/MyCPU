@@ -156,11 +156,6 @@ assign es_divisor_tdata  = es_alu_src2 ;
 assign es_dividend_tdata_u = es_alu_src1 ;
 assign es_divisor_tdata_u  = es_alu_src2 ;
 
-// assign es_divisor_tvalid = (div_op && !es_divisor_tready && !es_dividend_tready)?1: es_divisor_tvalid_r;
-// assign es_dividend_tvalid = (div_op && !es_divisor_tready && !es_dividend_tready)?1:es_dividend_tvalid_r;
-// assign es_divisor_tvalid_u = (divu_op && !es_divisor_tready_u && !es_dividend_tready_u)?1:es_divisor_tvalid_u_r;
-// assign es_dividend_tvalid_u = (divu_op && !es_divisor_tready_u && !es_dividend_tready_u)?1:es_dividend_tvalid_u_r;
-
 assign es_divisor_tvalid = es_divisor_tvalid_r;
 assign es_dividend_tvalid = es_dividend_tvalid_r;
 assign es_divisor_tvalid_u = es_divisor_tvalid_u_r;
@@ -175,7 +170,8 @@ assign es_lo_result = (div_op  && es_dout_tvalid  )?es_dout_tdata[63:32]:
                       (mult_op || multu_op        )?es_alu_lo_result:
                       0;
 
-reg div_en;
+reg div_en; //divid and unsigned divid enable
+
 always @(posedge clk ) begin
     if (reset) begin
        div_en<=1;
@@ -193,15 +189,16 @@ always @(posedge clk ) begin
         es_dividend_tvalid_r <=0;
         es_divisor_tvalid_r  <=0;  
     end
+    else if (div_op &&div_en) begin
+        es_dividend_tvalid_r <=1;
+        es_divisor_tvalid_r  <=1;
+    end
     
     else if (es_divisor_tready && es_dividend_tready) begin
         es_dividend_tvalid_r <=0;
         es_divisor_tvalid_r  <=0;
     end
-    else if (div_op &&div_en) begin
-        es_dividend_tvalid_r <=1;
-        es_divisor_tvalid_r  <=1;
-    end
+    
 end
 
 always @(posedge clk ) begin
@@ -209,15 +206,31 @@ always @(posedge clk ) begin
         es_dividend_tvalid_u_r <=0;
         es_divisor_tvalid_u_r  <=0;  
     end
-    else if (divu_op && !es_divisor_tready_u && !es_dividend_tready_u && div_en) begin
+    else if (divu_op &&div_en) begin
         es_dividend_tvalid_u_r <=1;
-        es_divisor_tvalid_u_r  <=1; 
+        es_divisor_tvalid_u_r  <=1;
     end
-    else if (es_divisor_tready_u  && es_dividend_tready_u) begin
+    else if (es_divisor_tready_u && es_dividend_tready_u) begin
         es_dividend_tvalid_u_r <=0;
-        es_divisor_tvalid_u_r  <=0; 
+        es_divisor_tvalid_u_r  <=0;
     end
+    
 end
+
+// always @(posedge clk ) begin
+//     if (reset) begin
+//         es_dividend_tvalid_u_r <=0;
+//         es_divisor_tvalid_u_r  <=0;  
+//     end
+//     else if (divu_op && !es_divisor_tready_u && !es_dividend_tready_u && div_en) begin
+//         es_dividend_tvalid_u_r <=1;
+//         es_divisor_tvalid_u_r  <=1; 
+//     end
+//     else if (es_divisor_tready_u  && es_dividend_tready_u) begin
+//         es_dividend_tvalid_u_r <=0;
+//         es_divisor_tvalid_u_r  <=0; 
+//     end
+// end
 
 //write or read hi/lo 
 assign hi_wdata = ((mult_op||multu_op||div_op||divu_op)&dest_is_hi)?es_hi_result:es_rs_value;

@@ -98,8 +98,8 @@ assign sr64_result = {{32{op_sra & alu_src2[31]}}, alu_src2[31:0]} >> alu_src1[4
 assign sr_result   = sr64_result[31:0];
 
 //MULT, MULTU result
-assign mult_result  = alu_src1 * alu_src2;
-assign multu_result = $signed(alu_src1)*$signed(alu_src2);
+assign multu_result  = alu_src1 * alu_src2;
+assign mult_result = $signed(alu_src1)*$signed(alu_src2);
 
 // final result mux
 assign alu_result = ({32{op_add|op_sub}} & add_sub_result)
