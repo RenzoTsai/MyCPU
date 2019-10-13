@@ -137,10 +137,11 @@ wire        rs_eq_rt;
 
 assign br_bus       = {br_taken,br_target};
 
-assign ds_to_es_bus = {res_from_hi ,  //143:143
+assign ds_to_es_bus = {src2_is_uimm ,  //144:144
+                       res_from_hi ,  //143:143
                        res_from_lo ,  //142:142
-                       dest_is_hi  ,  //141:141
-                       dest_is_lo  ,  //140:140
+                       dst_is_hi  ,  //141:141
+                       dst_is_lo  ,  //140:140
                        alu_op      ,  //139:124
                        load_op     ,  //123:123
                        src1_is_sa  ,  //122:122
@@ -251,15 +252,16 @@ assign alu_op[15] = inst_divu;
 
 assign src1_is_sa   = inst_sll   | inst_srl | inst_sra;
 assign src1_is_pc   = inst_jal;
-assign src2_is_imm  = inst_addiu | inst_lui | inst_lw | inst_sw | inst_addi | inst_slti | inst_sltiu | inst_andi | inst_ori | inst_xori;
+assign src2_is_imm  = inst_addiu | inst_lui | inst_lw | inst_sw | inst_addi | inst_slti | inst_sltiu;
+assign src2_is_uimm = inst_andi  | inst_ori | inst_xori;
 assign src2_is_8    = inst_jal;
 assign res_from_mem = inst_lw;
 assign dst_is_r31   = inst_jal;
 assign dst_is_rt    = inst_addiu | inst_lui | inst_lw | inst_addi | inst_slti | inst_sltiu | inst_andi | inst_ori | inst_xori;
 assign gr_we        = ~inst_sw & ~inst_beq & ~inst_bne & ~inst_jr;
 assign mem_we       = inst_sw;
-assign dest_is_hi   = inst_mthi | inst_mult | inst_multu | inst_divu | inst_div;
-assign dest_is_lo   = inst_mtlo | inst_mult | inst_multu | inst_divu | inst_div;
+assign dst_is_hi   = inst_mthi | inst_mult | inst_multu | inst_divu | inst_div;
+assign dst_is_lo   = inst_mtlo | inst_mult | inst_multu | inst_divu | inst_div;
 assign res_from_hi  = inst_mfhi ;
 assign res_from_lo  = inst_mflo;
 

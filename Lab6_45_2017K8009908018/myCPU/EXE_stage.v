@@ -71,7 +71,8 @@ wire es_dividend_tvalid_u;
 wire [63:0] es_dout_tdata_u;
 wire es_dout_tvalid_u;
 
-assign {es_res_from_hi ,  //143:143
+assign {es_es_src2_is_uimm, //144:144
+        es_res_from_hi ,  //143:143
         es_res_from_lo ,  //142:142
         dest_is_hi     ,  //141:141
         dest_is_lo     ,  //140:140
@@ -133,6 +134,7 @@ assign es_alu_src1 = es_src1_is_sa  ? {27'b0, es_imm[10:6]} :
                      es_src1_is_pc  ? es_pc[31:0] :
                                       es_rs_value;
 assign es_alu_src2 = es_src2_is_imm ? {{16{es_imm[15]}}, es_imm[15:0]} : 
+                     es_src2_is_uimm? {{16{0}}, es_imm[15:0]}
                      es_src2_is_8   ? 32'd8 :
                                       es_rt_value;
 //Handle mult & div:
@@ -167,7 +169,7 @@ assign es_lo_result = (div_op  && es_dout_tvalid  )?es_dout_tdata[31:0]:
 
 
 always @(posedge clk ) begin
-    if (rst) begin
+    if (reset) begin
         es_dividend_tvalid_r <=0;
         es_divisor_tvalid_r  <=0;  
     end
