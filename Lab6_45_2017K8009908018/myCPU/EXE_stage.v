@@ -32,6 +32,7 @@ wire        es_load_op    ;
 wire        es_src1_is_sa ;  
 wire        es_src1_is_pc ;
 wire        es_src2_is_imm; 
+wire        es_src2_is_uimm;
 wire        es_src2_is_8  ;
 wire        es_gr_we      ;
 wire        es_mem_we     ;
@@ -71,7 +72,7 @@ wire es_dividend_tvalid_u;
 wire [63:0] es_dout_tdata_u;
 wire es_dout_tvalid_u;
 
-assign {es_es_src2_is_uimm, //144:144
+assign {es_src2_is_uimm, //144:144
         es_res_from_hi ,  //143:143
         es_res_from_lo ,  //142:142
         dest_is_hi     ,  //141:141
@@ -134,7 +135,7 @@ assign es_alu_src1 = es_src1_is_sa  ? {27'b0, es_imm[10:6]} :
                      es_src1_is_pc  ? es_pc[31:0] :
                                       es_rs_value;
 assign es_alu_src2 = es_src2_is_imm ? {{16{es_imm[15]}}, es_imm[15:0]} : 
-                     es_src2_is_uimm? {{16{0}}, es_imm[15:0]}
+                     es_src2_is_uimm? {{16{1'b0}}, es_imm[15:0]}:
                      es_src2_is_8   ? 32'd8 :
                                       es_rt_value;
 //Handle mult & div:

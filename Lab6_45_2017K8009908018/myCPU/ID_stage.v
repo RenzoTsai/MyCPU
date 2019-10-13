@@ -58,6 +58,7 @@ wire        load_op;
 wire        src1_is_sa;
 wire        src1_is_pc;
 wire        src2_is_imm;
+wire        src2_is_uimm;
 wire        src2_is_8;
 wire        res_from_mem;
 wire        res_from_hi;
