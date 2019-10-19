@@ -40,8 +40,6 @@ assign op_sra  = alu_op[10];
 assign op_lui  = alu_op[11];
 assign op_mult = alu_op[12];
 assign op_multu= alu_op[13];
-assign op_div  = alu_op[14];
-assign op_divu = alu_op[15];
 
 wire [31:0] add_sub_result; 
 wire [31:0] slt_result; 

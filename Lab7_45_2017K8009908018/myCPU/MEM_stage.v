@@ -28,7 +28,11 @@ wire        ms_gr_we;
 wire [ 4:0] ms_dest;
 wire [31:0] ms_alu_result;
 wire [31:0] ms_pc;
-assign {ms_res_from_mem,  //70:70
+wire [ 2:0] ms_vaddr_2;
+wire [ 3:0] ms_load_type;
+assign {ms_vaddr_2     ,  //75:74
+        ms_load_type   ,  //73:71
+        ms_res_from_mem,  //70:70
         ms_gr_we       ,  //69:69
         ms_dest        ,  //68:64
         ms_alu_result  ,  //63:32
@@ -60,7 +64,19 @@ always @(posedge clk) begin
     end
 end
 
-assign mem_result = data_sram_rdata;
+assign mem_result =   (ms_load_type==`LB_TYPE &&ms_vaddr_2[1:0]==2'b00)?{{24{data_sram_rdata[ 7]}},data_sram_rdata[7:0]}:
+                      (ms_load_type==`LB_TYPE &&ms_vaddr_2[1:0]==2'b01)?{{24{data_sram_rdata[15]}},data_sram_rdata[15:8]}:
+                      (ms_load_type==`LB_TYPE &&ms_vaddr_2[1:0]==2'b10)?{{24{data_sram_rdata[23]}},data_sram_rdata[23:16]}:
+                      (ms_load_type==`LB_TYPE &&ms_vaddr_2[1:0]==2'b11)?{{24{data_sram_rdata[31]}},data_sram_rdata[31:24]}:
+                      (ms_load_type==`LBU_TYPE&&ms_vaddr_2[1:0]==2'b00)?{24'b0,data_sram_rdata[ 7:0]}:
+                      (ms_load_type==`LBU_TYPE&&ms_vaddr_2[1:0]==2'b01)?{24'b0,data_sram_rdata[15:8]}:
+                      (ms_load_type==`LBU_TYPE&&ms_vaddr_2[1:0]==2'b10)?{24'b0,data_sram_rdata[23:16]}:
+                      (ms_load_type==`LBU_TYPE&&ms_vaddr_2[1:0]==2'b11)?{24'b0,data_sram_rdata[31:24]}:
+                      (ms_load_type==`LH_TYPE &&ms_vaddr_2[1]==2'b0)   ?{{16{data_sram_rdata[15]}},data_sram_rdata[15:0]}:
+                      (ms_load_type==`LH_TYPE &&ms_vaddr_2[1]==2'b1)   ?{{16{data_sram_rdata[31]}},data_sram_rdata[31:16]}:
+                      (ms_load_type==`LHU_TYPE&&ms_vaddr_2[1]==2'b0)   ?{16'b0,data_sram_rdata[15: 0]}:
+                      (ms_load_type==`LHU_TYPE&&ms_vaddr_2[1]==2'b1)   ?{16'b0,data_sram_rdata[31:16]}:
+                      data_sram_rdata;
 
 assign ms_final_result = ms_res_from_mem ? mem_result
                                          : ms_alu_result;
