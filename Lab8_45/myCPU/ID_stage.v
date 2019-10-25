@@ -143,6 +143,10 @@ wire        inst_sh;
 wire        inst_swl;
 wire        inst_swr;
 
+wire        inst_eret;
+wire        inst_mfc0;
+wire        inst_mtc0;
+wire        inst_syscall;
 
 wire        dst_is_r31;  
 wire        dst_is_rt;
@@ -163,10 +167,24 @@ wire        rs_lt_zero;
 wire [ 2:0] load_type;
 wire [ 1:0] vaddr_2;
 wire [ 2:0] store_type;
+wire [ 2:0] exc_type;
+
+wire [ 7:0] rd_sel;
+wire        res_from_cp0;
+wire        mtc0_we;
+
+assign rd_sel  = {rd,ds_inst[2:0]} ;
+assign mtc0_we = inst_mtc0;
+assign exc_type = (inst_syscall)?`SYSCALL:0;
+
 
 assign br_bus       = {br_taken,br_target};
 
-assign ds_to_es_bus = {store_type  ,  //152:150
+assign ds_to_es_bus = {exc_type    ,  //165:163
+                       rd_sel      ,  //162:155
+                       res_from_cp0,  //154:154
+                       mtc0_we     ,  //153:153
+                       store_type  ,  //152:150
                        vaddr_2     ,  //149:148
                        load_type   ,  //147:145
                        src2_is_uimm,  //144:144
@@ -304,6 +322,12 @@ assign inst_sh     = op_d[6'h29];
 assign inst_swl    = op_d[6'h2a];
 assign inst_swr    = op_d[6'h2e];
 
+
+assign inst_eret   = op_d[6'h10] & rs_d[5'h10] & func_d[6'h18] & rd_d[5'h00] & rt_d[5'h00] & sa_d[5'h00];
+assign inst_mfc0   = op_d[6'h10] & rs_d[5'h00] & sa_d[5'h00] ;
+assign inst_mtc0   = op_d[6'h10] & rs_d[5'h04] & sa_d[5'h00] ;
+assign inst_syscall= op_d[6'h00] & func_d[6'h0c];
+
 assign alu_op[ 0] = inst_addu | inst_addiu | inst_lw | inst_sw  | inst_jal | inst_add | inst_addi | inst_bgezal | inst_bltzal   | inst_jalr
                     | inst_lb | inst_lbu   | inst_lh | inst_lhu | inst_sb  | inst_sh  | inst_swl  | inst_swr    | inst_lwl		| inst_lwr ;
 assign alu_op[ 1] = inst_subu | inst_sub;
@@ -331,13 +355,15 @@ assign src2_is_uimm = inst_andi  | inst_ori | inst_xori;
 assign src2_is_8    = inst_jal   | inst_bltzal | inst_bgezal | inst_jalr;
 assign res_from_mem = inst_lw    | inst_lb  | inst_lbu | inst_lh | inst_lhu | inst_lwl | inst_lwr;
 assign dst_is_r31   = inst_jal   | inst_bltzal | inst_bgezal;
-assign dst_is_rt    = inst_addiu | inst_lui | inst_lw | inst_addi | inst_slti | inst_sltiu | inst_andi | inst_ori | inst_xori | inst_lb | inst_lbu | inst_lh | inst_lhu | inst_lwl | inst_lwr;
+assign dst_is_rt    = inst_addiu | inst_lui | inst_lw  | inst_addi | inst_slti | inst_sltiu | inst_andi | inst_ori 
+                     | inst_xori | inst_lb  | inst_lbu | inst_lh   | inst_lhu  | inst_lwl   | inst_lwr  | inst_mfc0;
 assign gr_we        = ~inst_sw & ~inst_beq & ~inst_bne & ~inst_jr & ~inst_sb & ~inst_sh & ~inst_swl & ~inst_swr & ~inst_bgez & ~inst_bgtz& ~inst_blez & ~inst_bltz & ~inst_j ;
 assign mem_we       = inst_sw    | inst_sb  | inst_sh    | inst_swl  | inst_swr;
 assign dst_is_hi    = inst_mthi | inst_mult | inst_multu | inst_divu | inst_div;
 assign dst_is_lo    = inst_mtlo | inst_mult | inst_multu | inst_divu | inst_div;
-assign res_from_hi  = inst_mfhi ;
+assign res_from_hi  = inst_mfhi;
 assign res_from_lo  = inst_mflo;
+assign res_from_cp0 = inst_mfc0;
 
 assign dest         = dst_is_r31 ? 5'd31 :
                       dst_is_rt  ? rt    : 

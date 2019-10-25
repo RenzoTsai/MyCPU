@@ -1,10 +1,20 @@
-//cp0_regs
+//CP0_REG
+wire [31:0] cp0_wdata;
+wire wb_ex;
+wire wb_bd;
+wire eret_flush;
+wire mtc0_we;
+wire count_eq_compare;
+wire [ 7:0] cp0_addr;
+wire [ 4:0] wb_excode;
+wire [ 5:0] ext_int_in;
+
+//cp0_status
 wire [31:0] cp0_status;
 wire cp0_status_bev;
-reg  [7:0] cp0_status_im;
-reg cp0_status_exl;
-reg cp0_status_ie;
-
+reg  [ 7:0] cp0_status_im;
+reg  cp0_status_exl;
+reg  cp0_status_ie;
 assign cp0_status_bev = 1'b1;
 
 always @(posedge clk) begin
@@ -39,7 +49,7 @@ assign cp0_status = {   {9{1'b0}},      //31:23
                         cp0_status_ie   //0
                     } ;
 
-
+//cp0_cause
 wire [31:0] cp0_cause;
 reg cp0_cause_bd;
 reg cp0_cause_ti;
@@ -49,7 +59,7 @@ reg [4:0] cp0_cause_excode;
 always @(posedge clk) begin
     if (reset)
     cp0_cause_bd <= 1'b0;
-    else if (wb_ex && !c0_status_exl) 
+    else if (wb_ex && !cp0_status_exl) 
     cp0_cause_bd <= wb_bd;
 end
 
@@ -81,7 +91,7 @@ end
 
 always @(posedge clk) begin
     if (reset)
-        cp0_cause_excode <= 1'b0;
+        cp0_cause_excode <= 5'b0;
     else if (wb_ex)
         cp0_cause_excode <= wb_excode;
 end
@@ -95,11 +105,12 @@ assign cp0_cause =  {   cp0_cause_bd,     //31
                         {2{1'b0}}         //1:0  
                     } ;
 
+//cp0_epc
 reg [31:0] cp0_epc;
 
 always @(posedge clk) begin
     if (wb_ex && !cp0_status_exl)
-        cp0_epc <= wb_bd ? wb_pc – 3’h4 : wb_pc;
+        cp0_epc <= wb_bd ? ws_pc – 3'h4 : ws_pc;
     else if (mtc0_we && cp0_addr==`CR_EPC) 
         cp0_epc <= cp0_wdata;
 end

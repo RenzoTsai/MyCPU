@@ -32,7 +32,16 @@ wire [ 1:0] ms_vaddr_2;
 wire [ 2:0] ms_load_type;
 wire [31:0] ms_rt_value;
 
-assign {ms_rt_value    ,  //107:76
+wire [ 7:0] ms_rd_sel;
+wire        ms_res_from_cp0;
+wire        ms_mtc0_we;
+wire [ 2:0] ms_exc_type;
+
+assign {ms_exc_type    ,  //120:118
+        ms_rd_sel      ,  //117:110
+        ms_res_from_cp0,  //109:109
+        ms_mtc0_we     ,  //108:108
+        ms_rt_value    ,  //107:76
         ms_vaddr_2     ,  //75:74
         ms_load_type   ,  //73:71
         ms_res_from_mem,  //70:70
@@ -45,7 +54,12 @@ assign {ms_rt_value    ,  //107:76
 wire [31:0] mem_result;
 wire [31:0] ms_final_result;
 
-assign ms_to_ws_bus = {ms_gr_we       ,  //69:69
+assign ms_to_ws_bus = {
+                       ms_exc_type    ,  //82:80
+                       ms_rd_sel      ,  //79:72
+                       ms_res_from_cp0,  //71:71
+                       ms_mtc0_we     ,  //70:70
+                       ms_gr_we       ,  //69:69
                        ms_dest        ,  //68:64
                        ms_final_result,  //63:32
                        ms_pc             //31:0

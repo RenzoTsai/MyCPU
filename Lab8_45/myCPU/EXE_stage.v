@@ -90,7 +90,17 @@ wire es_dividend_tvalid_u;
 wire [63:0] es_dout_tdata_u;
 wire es_dout_tvalid_u;
 
-assign {es_store_type  ,  //152:150
+
+wire [ 7:0] es_rd_sel;
+wire        es_res_from_cp0;
+wire        es_mtc0_we;
+wire [ 2:0] es_exc_type;
+
+assign {es_exc_type    ,  //165:163
+        es_rd_sel      ,  //162:155
+        es_res_from_cp0,  //154:154
+        es_mtc0_we     ,  //153:153
+        es_store_type  ,  //152:150
         es_vaddr_2     ,  //149:148
         es_load_type   ,  //147:145
         es_src2_is_uimm,  //144:144
@@ -129,7 +139,11 @@ wire [31:0] lo_wdata;
 wire        es_res_from_mem;
 
 assign es_res_from_mem = es_load_op;
-assign es_to_ms_bus = {es_rt_value    ,  //107:76
+assign es_to_ms_bus = {es_exc_type    ,  //120:118
+                       es_rd_sel      ,  //117:110
+                       es_res_from_cp0,  //109:109
+                       es_mtc0_we     ,  //108:108
+                       es_rt_value    ,  //107:76
                        es_vaddr_2     ,  //75:74
                        es_load_type   ,  //73:71  
                        es_res_from_mem,  //70:70
