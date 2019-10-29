@@ -95,8 +95,12 @@ wire [ 7:0] es_rd_sel;
 wire        es_res_from_cp0;
 wire        es_mtc0_we;
 wire [ 2:0] es_exc_type;
+wire        es_eret;
+wire        es_bd;
 
-assign {es_exc_type    ,  //165:163
+assign {es_bd          ,  //167:167
+        es_eret        ,  //166:166
+        es_exc_type    ,  //165:163
         es_rd_sel      ,  //162:155
         es_res_from_cp0,  //154:154
         es_mtc0_we     ,  //153:153
@@ -139,7 +143,9 @@ wire [31:0] lo_wdata;
 wire        es_res_from_mem;
 
 assign es_res_from_mem = es_load_op;
-assign es_to_ms_bus = {es_exc_type    ,  //120:118
+assign es_to_ms_bus = {es_bd          ,  //122:122
+                       es_eret        ,  //121:121
+                       es_exc_type    ,  //120:118
                        es_rd_sel      ,  //117:110
                        es_res_from_cp0,  //109:109
                        es_mtc0_we     ,  //108:108
@@ -253,6 +259,7 @@ assign es_hi_we = dest_is_hi || (div_op&&(es_dout_tvalid_u || es_dout_tvalid ));
 assign es_lo_we = dest_is_lo || (div_op&&(es_dout_tvalid_u || es_dout_tvalid ));
 assign es_result = es_res_from_hi ? hi_rdata:
                    es_res_from_lo ? lo_rdata:
+                   es_mtc0_we     ? es_rt_value:
                    es_alu_result;
 
 //Write strb

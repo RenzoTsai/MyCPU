@@ -36,8 +36,12 @@ wire [ 7:0] ms_rd_sel;
 wire        ms_res_from_cp0;
 wire        ms_mtc0_we;
 wire [ 2:0] ms_exc_type;
+wire        ms_eret;
+wire        ms_bd;
 
-assign {ms_exc_type    ,  //120:118
+assign {ms_bd          ,  //122:122
+        ms_eret        ,  //121:121
+        ms_exc_type    ,  //120:118
         ms_rd_sel      ,  //117:110
         ms_res_from_cp0,  //109:109
         ms_mtc0_we     ,  //108:108
@@ -54,7 +58,8 @@ assign {ms_exc_type    ,  //120:118
 wire [31:0] mem_result;
 wire [31:0] ms_final_result;
 
-assign ms_to_ws_bus = {
+assign ms_to_ws_bus = {ms_bd          ,  //84:84
+                       ms_eret        ,  //83:83
                        ms_exc_type    ,  //82:80
                        ms_rd_sel      ,  //79:72
                        ms_res_from_cp0,  //71:71

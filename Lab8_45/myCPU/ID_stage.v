@@ -45,7 +45,16 @@ assign {ds_inst,
 wire        rf_we   ;
 wire [ 4:0] rf_waddr;
 wire [31:0] rf_wdata;
-assign {rf_we   ,  //40:37
+wire [31:0] cp0_epc;
+wire        ws_mtc0_we;
+wire        ws_gr_we;
+wire        ws_valid;
+
+assign {ws_mtc0_we ,  //72:72
+        cp0_epc ,  //71:40
+        ws_gr_we,  //39:39
+        ws_valid,  //38:38 
+        rf_we   ,  //37:37
         rf_waddr,  //36:32
         rf_wdata   //31:0
        } = ws_to_rf_bus;
@@ -172,15 +181,22 @@ wire [ 2:0] exc_type;
 wire [ 7:0] rd_sel;
 wire        res_from_cp0;
 wire        mtc0_we;
+wire        ds_eret;
+
+reg  bd_valid;
+wire ds_bd;
 
 assign rd_sel  = {rd,ds_inst[2:0]} ;
 assign mtc0_we = inst_mtc0;
 assign exc_type = (inst_syscall)?`SYSCALL:0;
+assign ds_eret  = inst_eret ;
 
 
-assign br_bus       = {br_taken,br_target};
+assign br_bus       = {inst_syscall,br_taken,br_target};
 
-assign ds_to_es_bus = {exc_type    ,  //165:163
+assign ds_to_es_bus = {ds_bd       ,  //167:167
+                       ds_eret     ,  //166:166
+                       exc_type    ,  //165:163
                        rd_sel      ,  //162:155
                        res_from_cp0,  //154:154
                        mtc0_we     ,  //153:153
@@ -209,17 +225,26 @@ assign ds_to_es_bus = {exc_type    ,  //165:163
 
 
 
-assign ds_ready_go=(out_es_valid && es_to_ms_bus[70] && es_to_ms_bus[69])? 0 :1;
+assign ds_ready_go= (out_es_valid && es_to_ms_bus[70] && es_to_ms_bus[69])? 0 :
+                    (out_es_valid &&es_to_ms_bus[109]&&(es_to_ms_bus[68:64]==rs||&es_to_ms_bus[68:64]==rt))?0:
+                    (out_ms_valid &&ms_to_ws_bus[71]&&(ms_to_ws_bus[68:64]==rs||&ms_to_ws_bus[68:64]==rt))?0:
+                    (out_es_valid &&es_to_ms_bus[108] && ds_eret)?0:
+                    (out_ms_valid &&es_to_ms_bus[ 70] && ds_eret)?0:
+                    (ws_valid && ws_mtc0_we && ds_eret)?0:
+                    1;
 
-assign ds_allowin     = !ds_valid || ds_ready_go && es_allowin;
+assign ds_allowin     = (!ds_valid || ds_ready_go && es_allowin) ;
 assign ds_to_es_valid = ds_valid && ds_ready_go;
 always @(posedge clk) begin
     if(reset)begin
     ds_valid<=0;
     end
+    else if(inst_syscall&& ds_allowin)begin
+            ds_valid<=0;
+    end
     else if (ds_allowin) begin
             ds_valid <= fs_to_ds_valid;
-     end
+    end
     if (fs_to_ds_valid && ds_allowin) begin
         fs_to_ds_bus_r <= fs_to_ds_bus;
     end
@@ -328,7 +353,7 @@ assign inst_mfc0   = op_d[6'h10] & rs_d[5'h00] & sa_d[5'h00] ;
 assign inst_mtc0   = op_d[6'h10] & rs_d[5'h04] & sa_d[5'h00] ;
 assign inst_syscall= op_d[6'h00] & func_d[6'h0c];
 
-assign alu_op[ 0] = inst_addu | inst_addiu | inst_lw | inst_sw  | inst_jal | inst_add | inst_addi | inst_bgezal | inst_bltzal   | inst_jalr
+assign alu_op[ 0] = inst_addu | inst_addiu | inst_lw | inst_sw  | inst_jal | inst_add | inst_addi | inst_bgezal | inst_bltzal | inst_jalr
                     | inst_lb | inst_lbu   | inst_lh | inst_lhu | inst_sb  | inst_sh  | inst_swl  | inst_swr    | inst_lwl		| inst_lwr ;
 assign alu_op[ 1] = inst_subu | inst_sub;
 assign alu_op[ 2] = inst_slt  | inst_slti;
@@ -357,7 +382,7 @@ assign res_from_mem = inst_lw    | inst_lb  | inst_lbu | inst_lh | inst_lhu | in
 assign dst_is_r31   = inst_jal   | inst_bltzal | inst_bgezal;
 assign dst_is_rt    = inst_addiu | inst_lui | inst_lw  | inst_addi | inst_slti | inst_sltiu | inst_andi | inst_ori 
                      | inst_xori | inst_lb  | inst_lbu | inst_lh   | inst_lhu  | inst_lwl   | inst_lwr  | inst_mfc0;
-assign gr_we        = ~inst_sw & ~inst_beq & ~inst_bne & ~inst_jr & ~inst_sb & ~inst_sh & ~inst_swl & ~inst_swr & ~inst_bgez & ~inst_bgtz& ~inst_blez & ~inst_bltz & ~inst_j ;
+assign gr_we        = ~inst_sw & ~inst_beq & ~inst_bne & ~inst_jr & ~inst_sb & ~inst_sh & ~inst_swl & ~inst_swr & ~inst_bgez & ~inst_bgtz& ~inst_blez & ~inst_bltz & ~inst_j & ~inst_mtc0 &~inst_syscall &~inst_eret;
 assign mem_we       = inst_sw    | inst_sb  | inst_sh    | inst_swl  | inst_swr;
 assign dst_is_hi    = inst_mthi | inst_mult | inst_multu | inst_divu | inst_div;
 assign dst_is_lo    = inst_mtlo | inst_mult | inst_multu | inst_divu | inst_div;
@@ -374,8 +399,6 @@ assign rf_raddr1 = rs;
 assign rf_raddr2 = rt;
 
 
-wire ws_valid;
-assign ws_valid = ws_to_rf_bus[38];
 
 
 regfile u_regfile(
@@ -392,13 +415,13 @@ regfile u_regfile(
 
 assign rs_value =  (rf_raddr1==es_to_ms_bus[68:64]&&es_to_ms_bus[69]&&es_to_ms_valid&&!es_to_ms_bus[70])?es_to_ms_bus[63:32]:
                    (rf_raddr1==ms_to_ws_bus[68:64]&&ms_to_ws_bus[69]&&ms_to_ws_valid)?ms_to_ws_bus[63:32]:
-                   (rf_raddr1==ws_to_rf_bus[36:32]&&ws_to_rf_bus[39]&&ws_valid)?ws_to_rf_bus[31:0]:
+                   (rf_raddr1==rf_waddr && ws_gr_we && ws_valid)?rf_wdata:
                    rf_rdata1;
                    
 
-assign rt_value =  (rf_raddr2==es_to_ms_bus[68:64]&&es_to_ms_bus[69:69]&&es_to_ms_valid&&!es_to_ms_bus[70])?es_to_ms_bus[63:32]:
-                   (rf_raddr2==ms_to_ws_bus[68:64]&&ms_to_ws_bus[69:69]&&ms_to_ws_valid)?ms_to_ws_bus[63:32]:
-                   (rf_raddr2==ws_to_rf_bus[36:32]&&ws_to_rf_bus[39:39]&&ws_valid)?ws_to_rf_bus[31:0]:
+assign rt_value =  (rf_raddr2==es_to_ms_bus[68:64]&&es_to_ms_bus[69]&&es_to_ms_valid&&!es_to_ms_bus[70])?es_to_ms_bus[63:32]:
+                   (rf_raddr2==ms_to_ws_bus[68:64]&&ms_to_ws_bus[69]&&ms_to_ws_valid)?ms_to_ws_bus[63:32]:
+                   (rf_raddr2==rf_waddr && ws_gr_we && ws_valid)?rf_wdata:
                    rf_rdata2;
                    
 
@@ -421,9 +444,30 @@ assign br_taken = (   inst_beq    &&  rs_eq_rt
                    || inst_bltzal && rs_lt_zero
                    || inst_bgezal && rs_ge_zero
                    || inst_jr
+                   || inst_syscall
+                   || inst_eret
                   ) && ds_valid;
 assign br_target = (inst_beq || inst_bne || inst_bgez || inst_bgtz || inst_blez || inst_bltz || inst_bltzal || inst_bgezal) ? (fs_pc + {{14{imm[15]}}, imm[15:0], 2'b0}) :
                    (inst_jr  || inst_jalr )              ? rs_value :
-                  /*inst_jal or inst_j*/    {fs_pc[31:28], jidx[25:0], 2'b0};
+                   (inst_syscall)                        ? 32'hbfc00380:
+                   (inst_eret)                           ? cp0_epc:
+                   /*inst_jal or inst_j*/               {fs_pc[31:28], jidx[25:0], 2'b0};
 
+
+
+
+
+always @(posedge clk) begin
+  if (reset) begin
+    bd_valid<=0;    
+  end
+  else if (br_taken &&~ inst_syscall) begin
+    bd_valid<=1;
+  end
+  else begin
+    bd_valid<=0;
+  end
+end
+
+assign ds_bd = inst_syscall && bd_valid;
 endmodule

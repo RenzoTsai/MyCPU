@@ -7,6 +7,8 @@ module if_stage(
     input                          ds_allowin     ,
     //brbus
     input  [`BR_BUS_WD-1       :0] br_bus         ,
+    //ws_to_fs_bus
+    input  [`WS_TO_FS_BUS_WD-1    :0] ws_to_fs_bus   ,
     //to ds
     output                         fs_to_ds_valid ,
     output [`FS_TO_DS_BUS_WD -1:0] fs_to_ds_bus   ,
@@ -26,9 +28,14 @@ wire        to_fs_valid;
 wire [31:0] seq_pc;
 wire [31:0] nextpc;
 
+
 wire         br_taken;
 wire [ 31:0] br_target;
 assign {br_taken,br_target} = br_bus;
+
+wire         ws_eret;
+wire [31:0]  ws_to_fs_pc;
+assign {ws_eret,ws_to_fs_pc} = ws_to_fs_bus;
 
 wire [31:0] fs_inst;
 reg  [31:0] fs_pc;
@@ -38,7 +45,10 @@ assign fs_to_ds_bus = {fs_inst ,
 // pre-IF stage
 assign to_fs_valid  = ~reset;
 assign seq_pc       = fs_pc + 3'h4;
-assign nextpc       = br_taken ? br_target : seq_pc; 
+
+assign nextpc       = br_taken ? br_target : 
+                     // ws_eret  ? ws_to_fs_pc :                      
+                                 seq_pc; 
 
 // IF stage
 assign fs_ready_go    = 1'b1;
