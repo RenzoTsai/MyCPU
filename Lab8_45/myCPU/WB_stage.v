@@ -216,6 +216,7 @@ end
 assign cp0_addr = ws_rd_sel;
 assign ws_rd  = ws_rd_sel[7:3];
 assign ws_sel = ws_rd_sel[2:0];
+//利用 & |
 assign cp0_result = (ws_rd==12 && ws_sel==0)? cp0_status:
                     (ws_rd==13 && ws_sel==0)? cp0_cause:
                     (ws_rd==14 && ws_sel==0)? cp0_epc:
