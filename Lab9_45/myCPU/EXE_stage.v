@@ -17,7 +17,12 @@ module exe_stage(
     output [ 3:0] data_sram_wen  ,
     output [31:0] data_sram_addr ,
     output [31:0] data_sram_wdata,
-    output out_es_valid
+    output out_es_valid,
+    input  ws_ex,
+    input  [ 3:0] ms_exc_type,
+    input  [ 3:0] ws_exc_type,
+    input  ms_eret,
+    input  eret_flush
 );
 
 
@@ -43,7 +48,7 @@ wire [31:0] es_rt_value   ;
 wire [31:0] es_pc         ;
 
 wire [ 2:0] es_load_type;
-wire [ 1:0] es_vaddr_2;
+wire [31:0] es_vaddr;
 wire [ 2:0] es_store_type;
 wire [ 3:0] write_strb;
 wire [31:0] store_data;
@@ -94,18 +99,21 @@ wire es_dout_tvalid_u;
 wire [ 7:0] es_rd_sel;
 wire        es_res_from_cp0;
 wire        es_mtc0_we;
-wire [ 2:0] es_exc_type;
+wire [ 3:0] es_exc_type;
 wire        es_eret;
 wire        es_bd;
+wire [ 3:0] ds_exc_type;
+wire        es_inst_ov;
+wire        ds_bd;
 
-assign {es_bd          ,  //167:167
-        es_eret        ,  //166:166
-        es_exc_type    ,  //165:163
-        es_rd_sel      ,  //162:155
-        es_res_from_cp0,  //154:154
-        es_mtc0_we     ,  //153:153
-        es_store_type  ,  //152:150
-        es_vaddr_2     ,  //149:148
+assign {es_inst_ov     ,  //167:167
+        ds_bd          ,  //166:166
+        es_eret        ,  //165:165
+        ds_exc_type    ,  //164:161
+        es_rd_sel      ,  //160:153
+        es_res_from_cp0,  //152:152
+        es_mtc0_we     ,  //151:151
+        es_store_type  ,  //150:148
         es_load_type   ,  //147:145
         es_src2_is_uimm,  //144:144
         es_res_from_hi ,  //143:143
@@ -127,6 +135,19 @@ assign {es_bd          ,  //167:167
         es_pc             //31 :0
        } = ds_to_es_bus_r;
 
+wire OV_EXE;
+
+assign OV_EXE = es_inst_ov & es_alu_overflow ;
+
+wire ADES_EXE;
+
+assign ADES_EXE = (es_store_type==`SW_TYPE  &&  es_vaddr[1:0]!=2'b00)?1:
+                  (es_store_type==`SH_TYPE  &&  es_vaddr[0]  !=1'b0) ?1:
+                  0;
+
+assign es_exc_type = (ds_exc_type==4'd0 && OV_EXE  )? `OV:
+                     (ds_exc_type==4'd0 && ADES_EXE)? `ADES: ds_exc_type;
+
 wire [31:0] es_alu_src1   ;
 wire [31:0] es_alu_src2   ;
 wire [31:0] es_alu_result ;
@@ -143,14 +164,17 @@ wire [31:0] lo_wdata;
 wire        es_res_from_mem;
 
 assign es_res_from_mem = es_load_op;
-assign es_to_ms_bus = {es_bd          ,  //122:122
-                       es_eret        ,  //121:121
-                       es_exc_type    ,  //120:118
+
+assign es_bd = ds_bd && es_valid;
+assign es_to_ms_bus = {es_vaddr[31:2] ,  //153:124
+                       es_bd          ,  //123:123
+                       es_eret        ,  //122:122
+                       es_exc_type    ,  //121:118
                        es_rd_sel      ,  //117:110
                        es_res_from_cp0,  //109:109
                        es_mtc0_we     ,  //108:108
                        es_rt_value    ,  //107:76
-                       es_vaddr_2     ,  //75:74
+                       es_vaddr[1:0]  ,  //75:74
                        es_load_type   ,  //73:71  
                        es_res_from_mem,  //70:70
                        es_gr_we       ,  //69:69
@@ -159,12 +183,15 @@ assign es_to_ms_bus = {es_bd          ,  //122:122
                        es_pc             //31:0
                       };
 
-assign es_ready_go    = !(div_op && !es_dout_tvalid) && !(divu_op && !es_dout_tvalid_u);
+assign es_ready_go    = (!(div_op && !es_dout_tvalid) && !(divu_op && !es_dout_tvalid_u));
 assign es_allowin     = !es_valid || es_ready_go && ms_allowin;
 assign es_to_ms_valid =  es_valid && es_ready_go;
 always @(posedge clk) begin
     if (reset) begin
         es_valid <= 1'b0;
+    end
+    else if (ws_ex || eret_flush) begin
+       es_valid <= 1'b0;
     end
     else if (es_allowin) begin
         es_valid <= ds_to_es_valid;
@@ -255,8 +282,8 @@ end
 //write or read hi/lo 
 assign hi_wdata = ((mult_op||multu_op||div_op||divu_op)&dest_is_hi)?es_hi_result:es_rs_value;
 assign lo_wdata = ((mult_op||multu_op||div_op||divu_op)&dest_is_lo)?es_lo_result:es_rs_value;
-assign es_hi_we = dest_is_hi || (div_op&&(es_dout_tvalid_u || es_dout_tvalid ));
-assign es_lo_we = dest_is_lo || (div_op&&(es_dout_tvalid_u || es_dout_tvalid ));
+assign es_hi_we = (dest_is_hi || (div_op&&(es_dout_tvalid_u || es_dout_tvalid )))&&((es_exc_type==4'd0) && (ms_exc_type==4'd0) && (ws_exc_type==4'd0)) && eret_flush==0 && ms_eret==0 ;
+assign es_lo_we = (dest_is_lo || (div_op&&(es_dout_tvalid_u || es_dout_tvalid )))&&((es_exc_type==4'd0) && (ms_exc_type==4'd0) && (ws_exc_type==4'd0)) && eret_flush==0 && ms_eret==0 ;
 assign es_result = es_res_from_hi ? hi_rdata:
                    es_res_from_lo ? lo_rdata:
                    es_mtc0_we     ? es_rt_value:
@@ -264,32 +291,32 @@ assign es_result = es_res_from_hi ? hi_rdata:
 
 //Write strb
 
-assign write_strb =     (es_store_type==`SWL_TYPE&&es_vaddr_2[1:0]==2'b00)?4'b0001:
-                        (es_store_type==`SWL_TYPE&&es_vaddr_2[1:0]==2'b01)?4'b0011:
-                        (es_store_type==`SWL_TYPE&&es_vaddr_2[1:0]==2'b10)?4'b0111:
-                        (es_store_type==`SWL_TYPE&&es_vaddr_2[1:0]==2'b11)?4'b1111:
-                        (es_store_type==`SWR_TYPE&&es_vaddr_2[1:0]==2'b00)?4'b1111:
-                        (es_store_type==`SWR_TYPE&&es_vaddr_2[1:0]==2'b01)?4'b1110:
-                        (es_store_type==`SWR_TYPE&&es_vaddr_2[1:0]==2'b10)?4'b1100:
-                        (es_store_type==`SWR_TYPE&&es_vaddr_2[1:0]==2'b11)?4'b1000:
-                        (es_store_type==`SB_TYPE &&es_vaddr_2[1:0]==2'b00)?4'b0001:
-                        (es_store_type==`SB_TYPE &&es_vaddr_2[1:0]==2'b01)?4'b0010:
-                        (es_store_type==`SB_TYPE &&es_vaddr_2[1:0]==2'b10)?4'b0100:
-                        (es_store_type==`SB_TYPE &&es_vaddr_2[1:0]==2'b11)?4'b1000:
-                        (es_store_type==`SH_TYPE &&es_vaddr_2[1]==1'b0)?4'b0011:
-                        (es_store_type==`SH_TYPE &&es_vaddr_2[1]==1'b1)?4'b1100:
+assign write_strb =     (es_store_type==`SWL_TYPE&&es_vaddr[1:0]==2'b00)?4'b0001:
+                        (es_store_type==`SWL_TYPE&&es_vaddr[1:0]==2'b01)?4'b0011:
+                        (es_store_type==`SWL_TYPE&&es_vaddr[1:0]==2'b10)?4'b0111:
+                        (es_store_type==`SWL_TYPE&&es_vaddr[1:0]==2'b11)?4'b1111:
+                        (es_store_type==`SWR_TYPE&&es_vaddr[1:0]==2'b00)?4'b1111:
+                        (es_store_type==`SWR_TYPE&&es_vaddr[1:0]==2'b01)?4'b1110:
+                        (es_store_type==`SWR_TYPE&&es_vaddr[1:0]==2'b10)?4'b1100:
+                        (es_store_type==`SWR_TYPE&&es_vaddr[1:0]==2'b11)?4'b1000:
+                        (es_store_type==`SB_TYPE &&es_vaddr[1:0]==2'b00)?4'b0001:
+                        (es_store_type==`SB_TYPE &&es_vaddr[1:0]==2'b01)?4'b0010:
+                        (es_store_type==`SB_TYPE &&es_vaddr[1:0]==2'b10)?4'b0100:
+                        (es_store_type==`SB_TYPE &&es_vaddr[1:0]==2'b11)?4'b1000:
+                        (es_store_type==`SH_TYPE &&es_vaddr[1]==1'b0)?4'b0011:
+                        (es_store_type==`SH_TYPE &&es_vaddr[1]==1'b1)?4'b1100:
                         4'hf;
 
  assign store_data = (es_store_type==`SB_TYPE) ? {4{es_rt_value[7:0]}}  : 
                      (es_store_type==`SH_TYPE) ? {2{es_rt_value[15:0]}} :
-                     (es_store_type==`SWL_TYPE&&es_vaddr_2[1:0]==2'b00)?{24'b0,es_rt_value[31:24]}:
-                     (es_store_type==`SWL_TYPE&&es_vaddr_2[1:0]==2'b01)?{16'b0,es_rt_value[31:16]}:
-                     (es_store_type==`SWL_TYPE&&es_vaddr_2[1:0]==2'b10)?{8'b0 ,es_rt_value[31:8]}:
-                     (es_store_type==`SWL_TYPE&&es_vaddr_2[1:0]==2'b11)?es_rt_value:
-                     (es_store_type==`SWR_TYPE&&es_vaddr_2[1:0]==2'b00)?es_rt_value:
-                     (es_store_type==`SWR_TYPE&&es_vaddr_2[1:0]==2'b01)?{es_rt_value[23:0],8'b0 }:
-                     (es_store_type==`SWR_TYPE&&es_vaddr_2[1:0]==2'b10)?{es_rt_value[15:0],16'b0}:
-                     (es_store_type==`SWR_TYPE&&es_vaddr_2[1:0]==2'b11)?{es_rt_value[ 7:0],24'b0}:
+                     (es_store_type==`SWL_TYPE&&es_vaddr[1:0]==2'b00)?{24'b0,es_rt_value[31:24]}:
+                     (es_store_type==`SWL_TYPE&&es_vaddr[1:0]==2'b01)?{16'b0,es_rt_value[31:16]}:
+                     (es_store_type==`SWL_TYPE&&es_vaddr[1:0]==2'b10)?{8'b0 ,es_rt_value[31:8]}:
+                     (es_store_type==`SWL_TYPE&&es_vaddr[1:0]==2'b11)?es_rt_value:
+                     (es_store_type==`SWR_TYPE&&es_vaddr[1:0]==2'b00)?es_rt_value:
+                     (es_store_type==`SWR_TYPE&&es_vaddr[1:0]==2'b01)?{es_rt_value[23:0],8'b0 }:
+                     (es_store_type==`SWR_TYPE&&es_vaddr[1:0]==2'b10)?{es_rt_value[15:0],16'b0}:
+                     (es_store_type==`SWR_TYPE&&es_vaddr[1:0]==2'b11)?{es_rt_value[ 7:0],24'b0}:
                      es_rt_value;
 alu u_alu(
     .alu_op         (es_alu_op    ),
@@ -336,8 +363,16 @@ mydivu u_mydivu(
     );
 
 assign data_sram_en    = 1'b1;
-assign data_sram_wen   = es_mem_we&&es_valid ? write_strb : 4'h0;
+assign data_sram_wen   = es_mem_we && es_valid && (es_exc_type==4'd0) && (ms_exc_type==4'd0) 
+                        && (ws_exc_type==4'd0) && ms_eret==0 && eret_flush==0 ? write_strb : 4'h0;
 assign data_sram_addr  = (es_load_type == `LW_TYPE || es_store_type == `SW_TYPE)?es_alu_result:{es_alu_result[31:2],2'b00};
 assign data_sram_wdata = store_data;
+
+
+assign es_vaddr = es_alu_result;
+
+
+
+
 
 endmodule

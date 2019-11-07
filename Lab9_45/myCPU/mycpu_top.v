@@ -30,8 +30,13 @@ wire         fs_to_ds_valid;
 wire         ds_to_es_valid;
 wire         es_to_ms_valid;
 wire         ms_to_ws_valid;
-wire        out_es_valid;
-wire        out_ms_valid;
+wire         out_es_valid;
+wire         out_ms_valid;
+wire         ws_ex;
+wire [ 3:0]  ms_exc_type;
+wire [ 3:0]  ws_exc_type;
+wire         ms_eret;
+wire         eret_flush;
 
 wire [`FS_TO_DS_BUS_WD -1:0] fs_to_ds_bus;
 wire [`DS_TO_ES_BUS_WD -1:0] ds_to_es_bus;
@@ -41,6 +46,7 @@ wire [`WS_TO_RF_BUS_WD -1:0] ws_to_rf_bus;
 wire [`BR_BUS_WD       -1:0] br_bus;
 wire [`WS_TO_FS_BUS_WD -1:0] ws_to_fs_bus;
 
+
 // IF stage
 if_stage if_stage(
     .clk            (clk            ),
@@ -49,17 +55,17 @@ if_stage if_stage(
     .ds_allowin     (ds_allowin     ),
     //brbus
     .br_bus         (br_bus         ),
-    //ws_to_fs_bus
-    .ws_to_fs_bus   (ws_to_fs_bus   ),
     //outputs
     .fs_to_ds_valid (fs_to_ds_valid ),
     .fs_to_ds_bus   (fs_to_ds_bus   ),
+    .ws_to_fs_bus   (ws_to_fs_bus   ),
     // inst sram interface
     .inst_sram_en   (inst_sram_en   ),
     .inst_sram_wen  (inst_sram_wen  ),
     .inst_sram_addr (inst_sram_addr ),
     .inst_sram_wdata(inst_sram_wdata),
     .inst_sram_rdata(inst_sram_rdata)
+
 );
 // ID stage
 id_stage id_stage(
@@ -104,7 +110,12 @@ exe_stage exe_stage(
     .data_sram_wen  (data_sram_wen  ),
     .data_sram_addr (data_sram_addr ),
     .data_sram_wdata(data_sram_wdata),
-    .out_es_valid(out_es_valid)
+    .out_es_valid(out_es_valid),
+    .ws_ex          (ws_ex          ),
+    .ms_exc_type    (ms_exc_type    ),
+    .ws_exc_type    (ws_exc_type    ),
+    .ms_eret        (ms_eret        ),
+    .eret_flush     (eret_flush     )
 );
 // MEM stage
 mem_stage mem_stage(
@@ -121,7 +132,11 @@ mem_stage mem_stage(
     .ms_to_ws_bus   (ms_to_ws_bus   ),
     //from data-sram
     .data_sram_rdata(data_sram_rdata),
-    .out_ms_valid(out_ms_valid)
+    .out_ms_valid(out_ms_valid),
+    .ws_ex          (ws_ex          ),
+    .ms_exc_type    (ms_exc_type    ),
+    .ms_eret        (ms_eret        ),
+    .eret_flush     (eret_flush     )
 );
 // WB stage
 wb_stage wb_stage(
@@ -139,7 +154,10 @@ wb_stage wb_stage(
     .debug_wb_pc      (debug_wb_pc      ),
     .debug_wb_rf_wen  (debug_wb_rf_wen  ),
     .debug_wb_rf_wnum (debug_wb_rf_wnum ),
-    .debug_wb_rf_wdata(debug_wb_rf_wdata)
+    .debug_wb_rf_wdata(debug_wb_rf_wdata),
+    .ws_ex          (ws_ex          ),
+    .ws_exc_type    (ws_exc_type    ),
+    .eret_flush     (eret_flush     )
 
 );
 

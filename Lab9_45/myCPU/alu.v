@@ -58,20 +58,20 @@ wire [63:0] multu_result;
 
 
 // 32-bit adder
-wire [31:0] adder_a;
-wire [31:0] adder_b;
+wire [32:0] adder_a;
+wire [32:0] adder_b;
 wire        adder_cin;
-wire [31:0] adder_result;
+wire [32:0] adder_result;
 wire        adder_cout;
 
-assign adder_a   = alu_src1;
-assign adder_b   = (op_sub | op_slt | op_sltu) ? ~alu_src2 : alu_src2;
+assign adder_a   = {alu_src1[31],alu_src1};
+assign adder_b   = (op_sub | op_slt | op_sltu) ? ~{alu_src2[31],alu_src2} : {alu_src2[31],alu_src2};
 assign adder_cin = (op_sub | op_slt | op_sltu) ? 1'b1      : 1'b0;
 assign {adder_cout, adder_result} = adder_a + adder_b + adder_cin;
 
 // ADD, SUB result
 assign add_sub_result = adder_result;
-assign alu_overflow = adder_result[32]^adder_result[31];
+assign alu_overflow = (adder_result[32]!=adder_result[31]);
 
 // SLT result
 assign slt_result[31:1] = 31'b0;
